@@ -165,7 +165,8 @@ compare_with_faction <- function (deps = NULL, fid = NULL,
     nfwf <- 0
     nfa <- 0
     j <- closestDate(searchDate = startDate, dateList = vottab$date)
-    while ((!(is.na(j)) && (j <= length(vottab$date))) && (vottab$date[j]<= endDate))    
+    if (is.na(j)) stop("Немає голосувань з такими датами, або ж дата не в тому форматі")
+    while ((j <= length(vottab$date)) && (vottab$date[j]<= endDate))    
     {
       if ((vottab$type[j] != 0) || (law_like_votings != TRUE))
       {
@@ -223,7 +224,8 @@ compare_deputies <- function (d1 = NULL, d2 = NULL,
   nfwd <- 0
   nfa <- 0
   j <- closestDate(searchDate = startDate, dateList = vottab$date)
-  while ((!(is.na(j)) && (j <= length(vottab$date))) && (vottab$date[j]<= endDate))
+  if (is.na(j)) stop("Немає голосувань з такими датами, або ж дата не в тому форматі")
+  while ((j <= length(vottab$date)) && (vottab$date[j]<= endDate))
   {
     if ((vottab$type[j] != 0) || (law_like_votings != TRUE)) 
     {
@@ -254,7 +256,57 @@ compare_deputies <- function (d1 = NULL, d2 = NULL,
   ret
 }
 
-
+compare_factions <- function (f1 = NULL, f2 = NULL, startDate = NULL, endDate = NULL,
+                              law_like_votings = FALSE)
+{
+  if (!(f1 %in% factids$ID)) stop("Некоректний ID першої фракції")
+  if (!(f2 %in% factids$ID)) stop("Некоректний ID другої фракції")
+  if (is.null(startDate)) 
+  {
+    startDate <- min(votings$date)
+  } else {
+    startDate <- as.Date(startDate, format="%d.%m.%Y")
+  }
+  if (is.null(endDate)) 
+  {
+    endDate <- max(votings$date)
+  } else
+  {
+    startDate <- as.Date(endDate, format="%d.%m.%Y")
+  }
+  fwf <- 0
+  fa <-0
+  nfwf <- 0
+  nfa <- 0
+  j <- closestDate(searchDate = startDate, dateList = vottab$date)
+  if (is.na(j)) stop("Немає голосувань з такими датами, або ж дата не в тому форматі")
+  while ((j <= length(vottab$date)) && (vottab$date[j]<= endDate))
+  {
+    if ((vottab$type[j] != 0) || (law_like_votings != TRUE)) 
+    {
+      fp1 <- match(f1,vottab$fv[[j]]$faction_ID)
+      fp2 <- match(f2,vottab$fv[[j]]$faction_ID)
+      if ((!is.na(fp1)) && (!is.na(fp2)))
+      {
+        if (vottab$fv[[j]]$support[fp1] == 1)
+        {
+          fa <- fa + 1
+          if (vottab$fv[[j]]$support[fp1] == vottab$fv[[j]]$support[fp2])
+            fwf <- fwf + 1
+        } else
+        {
+          nfa <- nfa + 1
+          if (vottab$fv[[j]]$support[fp1] == vottab$fv[[j]]$support[fp2])
+            nfwf <- nfwf + 1
+        }
+      }
+    }
+    j <- j + 1
+  }
+  ret <- c(fwf,fa,nfwf,nfa)
+  names(ret) <- c("for_with","for_all","not_for_with","not_for_all")
+  ret
+}
 
 preparedv <- function (startDate = NULL, endDate = NULL,
                        law_like_votings = FALSE, absence_as_against = TRUE)
