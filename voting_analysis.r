@@ -140,8 +140,19 @@ compare_with_faction <- function (deps = NULL, fid = NULL,
 {
   if (class(deps) != "numeric") stop("Invalid deputies shortlist")
   if (!(fid %in% factids$ID)) stop("Invalid faction_ID")
-  if (is.null(startDate)) startDate <- min(votings$date)
-  if (is.null(endDate)) endDate <- max(votings$date)
+  if (is.null(startDate)) 
+  {
+    startDate <- min(votings$date)
+  } else {
+    startDate <- as.Date(startDate, format="%d.%m.%Y")
+  }
+  if (is.null(endDate)) 
+  {
+    endDate <- max(votings$date)
+  } else
+  {
+    startDate <- as.Date(endDate, format="%d.%m.%Y")
+  }
   ret <- matrix(ncol = 5,nrow = length(deps))
   ret <- data.frame(ret)
   names(ret) <- c("deputy","for_with_faction","for_all",
@@ -153,10 +164,10 @@ compare_with_faction <- function (deps = NULL, fid = NULL,
     fa <-0
     nfwf <- 0
     nfa <- 0
-    j <- match (startDate, vottab$date)
+    j <- closestDate(searchDate = startDate, dateList = vottab$date)
     while ((!(is.na(j)) && (j <= length(vottab$date))) && (vottab$date[j]<= endDate))    
     {
-      if ((vottab$type[j] != 0) || (!law_like_votings))
+      if ((vottab$type[j] != 0) || (law_like_votings != TRUE))
       {
         dp <- match(d,vottab$pv[[j]]$MP_ID)
         fp <- match(fid,vottab$fv[[j]]$faction_ID)
@@ -188,29 +199,33 @@ compare_with_faction <- function (deps = NULL, fid = NULL,
   ret
 }
 
-
-
-
-
 compare_deputies <- function (d1 = NULL, d2 = NULL, 
                            startDate = NULL, endDate = NULL,
                            law_like_votings = FALSE, absence_as_against = TRUE)
 {
   if (!(d1 %in% mpids$MP_ID)) stop("Некоректний ID першого депутата")
   if (!(d2 %in% mpids$MP_ID)) stop("Некоректний ID другого депутата")
-  if (is.null(startDate)) startDate <- min(votings$date)
-  if (is.null(endDate)) endDate <- max(votings$date)
-  ret <- matrix(ncol=4, nrow = 1)
-  ret <- data.frame(ret)
-  names(ret) <- c("for_with","for_all","not_for_with","not_for_all")
+  if (is.null(startDate)) 
+  {
+    startDate <- min(votings$date)
+  } else {
+    startDate <- as.Date(startDate, format="%d.%m.%Y")
+  }
+  if (is.null(endDate)) 
+  {
+    endDate <- max(votings$date)
+  } else
+  {
+    startDate <- as.Date(endDate, format="%d.%m.%Y")
+  }
   fwd <- 0
   fa <-0
   nfwd <- 0
   nfa <- 0
-  j <- match (startDate, vottab$date)
+  j <- closestDate(searchDate = startDate, dateList = vottab$date)
   while ((!(is.na(j)) && (j <= length(vottab$date))) && (vottab$date[j]<= endDate))
   {
-    if ((vottab$type[j] != 0) || (!law_like_votings)) 
+    if ((vottab$type[j] != 0) || (law_like_votings != TRUE)) 
     {
       dp1 <- match(d1,vottab$pv[[j]]$MP_ID)
       dp2 <- match(d2,vottab$pv[[j]]$MP_ID)
@@ -234,10 +249,8 @@ compare_deputies <- function (d1 = NULL, d2 = NULL,
     }
     j <- j +1 
   }
-  ret$for_with <- fwd
-  ret$for_all <- fa
-  ret$not_for_with <- nfwd
-  ret$not_for_all <- nfa
+  ret <- c(fwd,fa,nfwd,nfa)
+  names(ret) <- c("for_with","for_all","not_for_with","not_for_all")
   ret
 }
 
@@ -280,7 +293,7 @@ compare_shortlist <- function (shortlist = NULL, startDate = NULL, endDate = NUL
 {
   if (sum(shortlist %in% mpids$MP_ID)<length(shortlist))
     stop("Не всі ID депутатів були введені коректно")
-  col <- rep(list(""), length(shortlist))
+  col <- rep(list(numeric(0)), length(shortlist))
   ret <- data.frame()
   n <- character()
   for (i in 1:length(shortlist))
@@ -316,7 +329,7 @@ preparevv <- function (startDate = NULL, endDate = NULL,
 {
   if (is.null(startDate)) startDate <- min(votings$date)
   if (is.null(endDate)) endDate <- max(votings$date)
-  if (!law_like_votings) 
+  if (law_like_votings != TRUE) 
   {
     v <- fn$sqldf("select * 
                    from votings 
@@ -376,6 +389,12 @@ addResults <- function(startDate = NULL, endDate = NULL)
     j <- j+1
   }
   r
+}
+
+closestDate <- function(searchDate, dateList) 
+{
+  dist <- dateList - searchDate
+  which(min(dist[dist>=0]) == dist)[1]
 }
 
 library(sqldf)
