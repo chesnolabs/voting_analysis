@@ -37,7 +37,7 @@ votan.init <- function (filenames = 'filenames.csv')
 	downloadMP (x[[3,1]])
 	downloadFactions (x[[4,1]])
 	downloadVotings (x[[5,1]])
-	addFactionHistory (x[[6,1]])
+#	addFactionHistory (x[[6,1]])
 	set_voting_types()
 	set_faction_support()
   vottab <<- create_voting_tables()
@@ -77,8 +77,8 @@ set_faction_support  <- function(first = NULL, last = NULL, light = FALSE)
   }  
   fdf <<- fn$sqldf(c("update fdf set support = 0 where (voting_ID >= $first) and (voting_ID <= $last)","select * from main.fdf"))
   if (light) 
-    fdf <<- fn$sqldf(c("update fdf set support = 1 where ([for_] > abstain + against + did_not_vote) and (voting_ID >= $first) and (voting_ID <= $last) ","select * from main.fdf"))
-  else fdf <<- fn$sqldf(c("update fdf set support = 1 where ([for_] > abstain + against + did_not_vote + absent) and (voting_ID >= $first) and (voting_ID <= $last)","select * from main.fdf")) 
+    fdf <<- fn$sqldf(c("update fdf set support = 1 where ([for.] > abstain + against + did_not_vote) and (voting_ID >= $first) and (voting_ID <= $last) ","select * from main.fdf"))
+  else fdf <<- fn$sqldf(c("update fdf set support = 1 where ([for.] > abstain + against + did_not_vote + absent) and (voting_ID >= $first) and (voting_ID <= $last)","select * from main.fdf")) 
   
 }
 
@@ -138,7 +138,7 @@ compare_with_faction <- function (deps = NULL, fid = NULL,
                       startDate = NULL, endDate = NULL, 
                       law_like_votings = FALSE, absence_as_against = TRUE)
 {
-  if (class(deps) != "numeric") stop("Invalid deputies shortlist")
+  if ((class(deps) != "numeric") & (class(deps) != "integer")) stop("Invalid deputies shortlist")
   if (!(fid %in% factids$ID)) stop("Invalid faction_ID")
   if (is.null(startDate)) 
   {
@@ -409,13 +409,13 @@ create_voting_tables <- function (startDate = NULL, endDate = NULL)
   for (i in 1:length(v$voting_ID))
   {
     id <- v$voting_ID[i]
-    t <- fn$sqldf("select MP_ID, voting, faction
+    t <- fn$sqldf("select MP_ID, voting, faction_id
                   from mpdf2
                   where voting_ID = $id
                   order by MP_ID")
     l[[i]] <- t
     t <- fn$sqldf("select faction_ID,
-                  for_ as for, against, abstain, 
+                  [for.] as for, against, abstain, 
                   did_not_vote, absent, support
                   from fv
                   where voting_ID = $id
