@@ -180,7 +180,7 @@ compare_with_faction <- function (deps = NULL, fid = NULL,
             if (vottab$fv[[j]]$support[fp] == 1) fwf <- fwf+1
           }
           else  {
-            if ((grepl("Відс",vottab$pv[[j]]$voting[dp]) != 1) || (absence_as_against))
+            if ((grepl("Відс",vottab$pv[[j]]$voting[dp]) != TRUE) || (absence_as_against))
             {
               if (!is.null(vottab$pv[[j]]$voting[dp])) nfa <- nfa + 1
               if (vottab$fv[[j]]$support[fp] == 0) nfwf <- nfwf+1
@@ -447,6 +447,73 @@ closestDate <- function(searchDate, dateList)
 {
   dist <- dateList - searchDate
   which(min(dist[dist>=0]) == dist)[1]
+}
+
+compare_faction_with_deps <- function (deps = NULL, fid = NULL, 
+                                  startDate = NULL, endDate = NULL, 
+                                  law_like_votings = FALSE, absence_as_against = TRUE)
+{
+  if ((class(deps) != "numeric") & (class(deps) != "integer")) stop("Invalid deputies shortlist")
+  if (!(fid %in% factids$ID)) stop("Invalid faction_ID")
+  if (is.null(startDate)) 
+  {
+    startDate <- min(votings$date)
+  } else {
+    startDate <- as.Date(startDate, format="%d.%m.%Y")
+  }
+  if (is.null(endDate)) 
+  {
+    endDate <- max(votings$date)
+  } else
+  {
+    startDate <- as.Date(endDate, format="%d.%m.%Y")
+  }
+  ret <- matrix(ncol = 5,nrow = length(deps))
+  ret <- data.frame(ret)
+  names(ret) <- c("deputy","for_with_faction","for_all",
+                  "not_for_with_faction","not_for_all")
+  for (i in 1:length(deps))
+  {
+    d <- deps[i]
+    fwf <- 0
+    fa <-0
+    nfwf <- 0
+    nfa <- 0
+    j <- closestDate(searchDate = startDate, dateList = vottab$date)
+    if (is.na(j)) stop("Немає голосувань з такими датами, або ж дата не в тому форматі")
+    while ((j <= length(vottab$date)) && (vottab$date[j]<= endDate))    
+    {
+      if ((vottab$type[j] != 0) || (law_like_votings != TRUE))
+      {
+        dp <- match(d,vottab$pv[[j]]$MP_ID)
+        fp <- match(fid,vottab$fv[[j]]$faction_ID)
+        if ((!is.na(dp)) && (!is.na(fp)))
+        {
+          if ((vottab$fv[[j]]$support[fp] == 1) && ((grepl("Відс",vottab$pv[[j]]$voting[dp]) != TRUE) || (absence_as_against)))
+          {
+            fa <- fa + 1
+            if (grepl("За",vottab$pv[[j]]$voting[dp]) == 1) fwf <- fwf+1
+            
+          }
+          else  {
+            if ((grepl("Відс",vottab$pv[[j]]$voting[dp]) != TRUE) || (absence_as_against))
+            {
+              if (!is.null(vottab$fv[[j]]$support[fp])) nfa <- nfa + 1
+              if (grepl("За",vottab$pv[[j]]$voting[dp]) != 1) nfwf <- nfwf+1
+            }
+          }  
+        }
+      }
+      j <- j+1
+    }
+    ret$for_with_faction[i] <- fwf
+    ret$for_all[i] <- fa
+    ret$not_for_with_faction[i] <- nfwf
+    ret$not_for_all[i] <- nfa
+    ret$deputy[i] <- as.character(fn$sqldf("select Deputy_name from mpids
+                                           where MP_ID = $d")[[1]])
+  }
+  ret
 }
 
 library(sqldf)
