@@ -454,11 +454,8 @@ closestDate <- function(searchDate, dateList)
   which(min(dist[dist>=0]) == dist)[1]
 }
 
-<<<<<<< HEAD
-find_loyal_deputies <- function (deps = NULL, fid = NULL, 
-=======
+
 compare_faction_with_deps <- function (deps = NULL, fid = NULL, 
->>>>>>> 1de34c2420274292303b4b2df603b55afc3bb36b
                                   startDate = NULL, endDate = NULL, 
                                   law_like_votings = FALSE, absence_as_against = TRUE)
 {
