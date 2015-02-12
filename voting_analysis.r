@@ -38,11 +38,16 @@ votan.init <- function (filenames = 'filenames.csv')
 	downloadFactions (x[[4,1]])
 	downloadVotings (x[[5,1]])
 #	addFactionHistory (x[[6,1]])
+  print("Setting voting types...")
 	set_voting_types()
+  print("Setting faction support...")
 	set_faction_support()
+  print("Creating main table vottab...")
   vottab <<- create_voting_tables()
+  print("Calculating results of the votings...")
   votings$result <<- addResults()
   vottab$result <<- votings$result
+  print("Saving...")
   save(mpdf, file = "votan/mpdf.Rda")
   save(votings, file = "votan/votings.Rda")
   save(fdf, file = "votan/fdf.Rda")
@@ -449,7 +454,11 @@ closestDate <- function(searchDate, dateList)
   which(min(dist[dist>=0]) == dist)[1]
 }
 
+<<<<<<< HEAD
+find_loyal_deputies <- function (deps = NULL, fid = NULL, 
+=======
 compare_faction_with_deps <- function (deps = NULL, fid = NULL, 
+>>>>>>> 1de34c2420274292303b4b2df603b55afc3bb36b
                                   startDate = NULL, endDate = NULL, 
                                   law_like_votings = FALSE, absence_as_against = TRUE)
 {
