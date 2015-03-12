@@ -19,6 +19,15 @@ downloadVotings <- function(fl)
 	votings <<- read.table(fl, colClasses = classes, sep = "\t", header = TRUE, quote = "")
 }
 
+exclude_blank_votings <- function()
+{
+  exclude <- votings$voting_ID[votings$title == '""']
+  votings <<- votings[!(votings$voting_ID %in% exclude), ]
+  fdf <<- fdf[!(fdf$voting_ID %in% exclude), ]
+  mpdf <<- mpdf[!(mpdf$voting_ID %in% exclude), ]
+  vottab <<- vottab[!(vottab$voting_ID %in% exclude), ]
+}
+
 findIDs <- function (MPids = "", factionIDS = "")
 {
 	x <- read.csv(MPids, nrows = 5, header = FALSE)
@@ -47,6 +56,8 @@ votan.init <- function (filenames = 'filenames.csv')
   print("Calculating results of the votings...")
   votings$result <<- addResults()
   vottab$result <<- votings$result
+  print("Excluding blank votings...")
+  exclude_blank_votings()
   print("Saving...")
   save(mpdf, file = "votan/mpdf.Rda")
   save(votings, file = "votan/votings.Rda")
