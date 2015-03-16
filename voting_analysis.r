@@ -1,22 +1,22 @@
-downloadMP <- function (fl) 
+loadMP <- function (fl) 
 {
 	x <- read.csv(fl, nrows = 5)
 	classes <- sapply(x,class)
-	mpdf <<- read.csv(fl, colClasses = classes)
+	read.csv(fl, colClasses = classes)
 }
 
-downloadFactions <- function(fl)
+loadFactions <- function(fl)
 {
   classes = rep("numeric",7)
-	fdf <<- read.csv(fl, colClasses = classes, comment.char = "\"", quote = "")
+	read.csv(fl, colClasses = classes, comment.char = "\"", quote = "")
 }
 
-downloadVotings <- function(fl)
+loadVotings <- function(fl)
 {
   setClass('myDate')
   setAs("character","myDate", function(from) as.Date(from, format="%d.%m.%Y"))   
   classes <- c ("numeric","myDate","character","character")
-	votings <<- read.table(fl, colClasses = classes, sep = "\t", header = TRUE, quote = "")
+	read.table(fl, colClasses = classes, sep = "\t", header = TRUE, quote = "")
 }
 
 exclude_blank_votings <- function()
@@ -43,22 +43,23 @@ votan.init <- function (filenames = 'filenames.csv')
 {
 	x <- read.table(filenames, nrows = 6, colClasses = c("character"))
 	findIDs (x[[1,1]], x[[2,1]])
-	downloadMP (x[[3,1]])
-	downloadFactions (x[[4,1]])
-	downloadVotings (x[[5,1]])
+	mpdf <<- loadMP (x[[3,1]])
+	fdf <<- loadFactions (x[[4,1]])
+	votings <<- loadVotings (x[[5,1]])
 #	addFactionHistory (x[[6,1]])
   print("Setting voting types...")
-	set_voting_types()
+	votings <<- set_voting_types(votings)
   print("Setting faction support...")
-	set_faction_support()
+	fdf <<- set_faction_support(votings, fdf)
   print("Creating main table vottab...")
-  vottab <<- create_voting_tables()
+  vottab <<- create_voting_tables(votings, fdf, mpdf)
   print("Calculating results of the votings...")
-  votings$result <<- addResults()
+  votings$result <<- addResults(vottab)
   vottab$result <<- votings$result
   print("Excluding blank votings...")
   exclude_blank_votings()
   print("Saving...")
+  dir.create("votan/")
   save(mpdf, file = "votan/mpdf.Rda")
   save(votings, file = "votan/votings.Rda")
   save(fdf, file = "votan/fdf.Rda")
@@ -67,34 +68,61 @@ votan.init <- function (filenames = 'filenames.csv')
   save(vottab, file = "votan/vottab.Rda")
 }
 
-set_voting_types <- function (first = NULL, last = NULL)
+append <- function(filenames = 'filenames.csv')
+{
+  x <- read.table(filenames, nrows = 6, colClasses = c("character"))
+  findIDs (x[[1,1]], x[[2,1]])
+  new_mpdf <- loadMP (x[[3,1]])
+  new_fdf <- loadFactions (x[[4,1]])
+  new_votings <- loadVotings (x[[5,1]])
+  new_votings <- set_voting_types(new_votings)
+  new_fdf <- set_faction_support(new_votings,new_fdf)
+  new_vottab <- create_voting_tables(new_votings, new_fdf, new_mpdf)
+  new_votings$result <- addResults(new_vottab)
+  new_vottab$result <- new_votings$result
+  loadData()
+  votings <<- rbind(votings, new_votings)
+  mpdf <<- rbind(mpdf,new_mpdf)
+  fdf <<- rbind(fdf, new_fdf)
+  vottab <<- rbind(vottab, new_vottab)
+  exclude_blank_votings()
+  save(mpdf, file = "votan/mpdf.Rda")
+  save(votings, file = "votan/votings.Rda")
+  save(fdf, file = "votan/fdf.Rda")
+  save(factids, file = "votan/factids.Rda")
+  save(mpids, file = "votan/mpids.Rda")
+  save(vottab, file = "votan/vottab.Rda")
+}
+
+set_voting_types <- function (votings, first = NULL, last = NULL)
 {
 	if (is.null(first)) first <- min(votings$voting_ID)
 	if (is.null(last)) last <- max(votings$voting_ID)
 	if (is.null(votings$type))
 	{
 		type <- rep (0, length.out = length(votings$voting_ID))
-		votings$type <<- type
+		votings$type <- type
 	}
-  votings <<- fn$sqldf(c("update votings set type = 1 where like('%проект Закону%',title) and like('%за основу%',title)", "select * from main.votings"))
-	votings <<- fn$sqldf(c("update votings set type = 2 where like('%проект Закону%',title) and like('%в цілому%',title)",  "select * from main.votings"))
-  votings <<- fn$sqldf(c("update votings set type = 3 where like('%поправ%',title) and like ('%проекту Закону%',title)",  "select * from main.votings"))
-	votings <<- fn$sqldf(c("update votings set type = 4 where like ('%порядку денного%',title) and like ('%проект%',title) and like('%закон%',title) and (like('%розгляд%',title) = 0) ",  "select * from  main.votings"))
+  votings <- fn$sqldf(c("update votings set type = 1 where like('%проект Закону%',title) and like('%за основу%',title)", "select * from main.votings"))
+	votings <- fn$sqldf(c("update votings set type = 2 where like('%проект Закону%',title) and like('%в цілому%',title)",  "select * from main.votings"))
+  votings <- fn$sqldf(c("update votings set type = 3 where like('%поправ%',title) and like ('%проекту Закону%',title)",  "select * from main.votings"))
+	votings <- fn$sqldf(c("update votings set type = 4 where like ('%порядку денного%',title) and like ('%проект%',title) and like('%закон%',title) and (like('%розгляд%',title) = 0) ",  "select * from  main.votings"))
+  votings
 }
 
-set_faction_support  <- function(first = NULL, last = NULL, light = FALSE)
+set_faction_support  <- function(votings, fdf, first = NULL, last = NULL, light = FALSE)
 { 
   if (is.null(first)) first <- min(votings$voting_ID)
   if (is.null(last)) last <- max(votings$voting_ID)
   if (is.null(fdf$support))
   {
     support <- rep (0, length.out = length(fdf$voting_ID))
-    fdf$support <<- support
+    fdf$support <- support
   }  
-  fdf <<- fn$sqldf(c("update fdf set support = 0 where (voting_ID >= $first) and (voting_ID <= $last)","select * from main.fdf"))
+  fdf <- fn$sqldf(c("update fdf set support = 0 where (voting_ID >= $first) and (voting_ID <= $last)","select * from main.fdf"))
   if (light) 
-    fdf <<- fn$sqldf(c("update fdf set support = 1 where ([for.] > abstain + against + did_not_vote) and (voting_ID >= $first) and (voting_ID <= $last) ","select * from main.fdf"))
-  else fdf <<- fn$sqldf(c("update fdf set support = 1 where ([for.] > abstain + against + did_not_vote + absent) and (voting_ID >= $first) and (voting_ID <= $last)","select * from main.fdf")) 
+    fn$sqldf(c("update fdf set support = 1 where ([for.] > abstain + against + did_not_vote) and (voting_ID >= $first) and (voting_ID <= $last) ","select * from main.fdf"))
+  else fn$sqldf(c("update fdf set support = 1 where ([for.] > abstain + against + did_not_vote + absent) and (voting_ID >= $first) and (voting_ID <= $last)","select * from main.fdf")) 
   
 }
 
@@ -324,35 +352,8 @@ compare_factions <- function (f1 = NULL, f2 = NULL, startDate = NULL, endDate = 
   ret
 }
 
-preparedv <- function (startDate = NULL, endDate = NULL,
-                       law_like_votings = FALSE, absence_as_against = TRUE)
-{
-  v <- preparevv (startDate = startDate, endDate = endDate,
-                  law_like_votings = law_like_votings)
-  mpdf2 <- fn$sqldf("select mpdf.* 
-                   from mpdf, v 
-                   where (v.voting_ID = mpdf.voting_ID)
-                   ")
-  if (!absence_as_against)
-  {
-    mpdf2 <- fn$sqldf("select * 
-                        from mpdf2 
-                        where not like('В%', voting)
-                        ")
-  }
-  mpdf2
-}
-preparefv <- function (startDate = NULL, endDate = NULL,
-                       law_like_votings = FALSE)
-{
-  v <- preparevv (startDate = startDate, endDate = endDate,
-                  law_like_votings = law_like_votings)
-  fv <- fn$sqldf("select fdf.* 
-                   from fdf, v 
-                   where (v.voting_ID = fdf.voting_ID)
-                   ")
-  fv
-}  
+
+
 
 
 
@@ -392,31 +393,68 @@ compare_shortlist <- function (shortlist = NULL, startDate = NULL, endDate = NUL
   ret
 }
 
-preparevv <- function (startDate = NULL, endDate = NULL,
-                       law_like_votings = FALSE)
+
+
+create_voting_tables <- function (votings, fdf, mpdf, startDate = NULL, endDate = NULL)
+# Create a table in format suitable for comparing deputies
 {
-  if (is.null(startDate)) startDate <- min(votings$date)
-  if (is.null(endDate)) endDate <- max(votings$date)
-  if (law_like_votings != TRUE) 
+  preparevv <- function (startDate = NULL, endDate = NULL,
+                         law_like_votings = FALSE)
+  # Helper function. Takes a votings massive in a range of given dates.  
   {
-    v <- fn$sqldf("select * 
+    if (is.null(startDate)) startDate <- min(votings$date)
+    if (is.null(endDate)) endDate <- max(votings$date)
+    if (law_like_votings != TRUE) 
+    {
+      v <- fn$sqldf("select * 
                    from votings 
                    where (date <= $endDate)
                    and (date >= $startDate)")
-    
-  } else {
-    v <- fn$sqldf("select * 
+      
+    } else {
+      v <- fn$sqldf("select * 
                      from votings 
                      where (date <= $endDate)
                      and (date >= $startDate)
                      and (type != 0)")
-    
+      
+    }
+    v
+  }  
+  
+  preparefv <- function (startDate = NULL, endDate = NULL,
+                         law_like_votings = FALSE)
+  # Helper function. Takes factions votings.    
+  {
+    v <- preparevv (startDate = startDate, endDate = endDate,
+                    law_like_votings = law_like_votings)
+    fv <- fn$sqldf("select fdf.* 
+                   from fdf, v 
+                   where (v.voting_ID = fdf.voting_ID)
+                   ")
+    fv
+  }  
+  
+  preparedv <- function (startDate = NULL, endDate = NULL,
+                         law_like_votings = FALSE, absence_as_against = TRUE)
+  # Helper function. Takes MP's votings.  
+  {
+    v <- preparevv (startDate = startDate, endDate = endDate,
+                    law_like_votings = law_like_votings)
+    mpdf2 <- fn$sqldf("select mpdf.* 
+                   from mpdf, v 
+                   where (v.voting_ID = mpdf.voting_ID)
+                   ")
+    if (!absence_as_against)
+    {
+      mpdf2 <- fn$sqldf("select * 
+                        from mpdf2 
+                        where not like('В%', voting)
+                        ")
+    }
+    mpdf2
   }
-  v
-}
-
-create_voting_tables <- function (startDate = NULL, endDate = NULL)
-{
+  
   mpdf2 <- preparedv(startDate = startDate, endDate = endDate)
   v <- preparevv(startDate = startDate, endDate = endDate)
   fv <- preparefv(startDate = startDate, endDate = endDate)
@@ -443,10 +481,10 @@ create_voting_tables <- function (startDate = NULL, endDate = NULL)
   v
 }
 
-addResults <- function(startDate = NULL, endDate = NULL)
+addResults <- function(vottab, startDate = NULL, endDate = NULL)
 {
-  if (is.null(startDate)) startDate <- min(votings$date)
-  if (is.null(endDate)) endDate <- max(votings$date)
+  if (is.null(startDate)) startDate <- min(vottab$date)
+  if (is.null(endDate)) endDate <- max(vottab$date)
   j <- match(startDate,vottab$date)  
   r <- numeric()
   while ((!(is.na(j)) && (j <= length(vottab$date))) && (vottab$date[j]<= endDate))
